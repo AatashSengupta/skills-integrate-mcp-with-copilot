@@ -1,0 +1,41 @@
+name: Create missing feature issues
+
+on:
+  push:
+    paths:
+      - '.github/issue-data.json'
+      - '.github/workflows/create-missing-features-issues.yml'
+
+jobs:
+  create_issues:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create missing feature issues
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const data = JSON.parse(fs.readFileSync('.github/issue-data.json', 'utf8'));
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all',
+              per_page: 100
+            });
+            const existingTitles = new Set(existing.data.map(issue => issue.title));
+            for (const issue of data.issues) {
+              if (!existingTitles.has(issue.title)) {
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: issue.title,
+                  body: issue.body,
+                  labels: issue.labels || ['enhancement']
+                });
+                console.log(`Created issue: ${issue.title}`);
+              } else {
+                console.log(`Skipping existing issue: ${issue.title}`);
+              }
+            }
